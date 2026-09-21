@@ -464,8 +464,11 @@ elif menu == "Integracao ML":
     # Se veio um código de autorização na URL e ainda não estamos conectados, faz a troca automática agora
     if auth_code and not is_connected:
         with st.spinner("A ligar através da ponte segura do Supabase..."):
-            # Substitua <seu-projeto-id> pelo ID real do seu projeto Supabase
             edge_function_url = "https://gcjyhaamliodpcdphwsg.supabase.co/functions/v1/exchange-ml-token"
+            
+            # Certifique-se de que a chave corresponde à sua chave anónima/pública do Supabase guardada no st.secrets
+            # (Pode ajustar para st.secrets["SUPABASE_KEY"] ou o nome exato que utiliza no seu cofre)
+            supabase_key = st.secrets["SUPABASE_KEY"] 
             
             payload = {
                 "code": auth_code,
@@ -474,9 +477,14 @@ elif menu == "Integracao ML":
                 "redirect_uri": ML_REDIRECT_URI
             }
             
+            headers = {
+                "apikey": supabase_key,
+                "Authorization": f"Bearer {supabase_key}",
+                "Content-Type": "application/json"
+            }
+            
             try:
-                # O Streamlit comunica livremente com o Supabase, que por sua vez acede à API do Mercado Livre
-                response = requests.post(edge_function_url, json=payload, timeout=30)
+                response = requests.post(edge_function_url, json=payload, headers=headers, timeout=30)
                 
                 if response.status_code == 200:
                     token_data = response.json()
