@@ -586,13 +586,15 @@ elif menu == "Integracao ML":
         codigo_url = st.text_input("https://erp-bmakeup.streamlit.app")
         
         if st.button("Gerar Token de Acesso"):
-            if codigo_url:
+        if codigo_url:
+            try:
+                # Extrai o código de forma segura da URL ou usa direto se for o token limpo
                 if "code=" in codigo_url:
                     code = codigo_url.split("code=")[1].split("&")[0]
                 else:
                     code = codigo_url.strip()
                     
-                with st.spinner("Gerando chave de acesso..."):
+                with st.spinner("Conectando com o Mercado Livre para gerar o token..."):
                     token_url = "https://api.mercadolivre.com/oauth/token"
                     payload = {
                         "grant_type": "authorization_code",
@@ -606,7 +608,8 @@ elif menu == "Integracao ML":
                         "content-type": "application/x-www-form-urlencoded"
                     }
                     
-                    response = requests.post(token_url, data=payload, headers=headers)
+                    # Adicionamos timeout para evitar travamentos longos de DNS
+                    response = requests.post(token_url, data=payload, headers=headers, timeout=15)
                     
                     if response.status_code == 200:
                         token_data = response.json()
@@ -622,6 +625,10 @@ elif menu == "Integracao ML":
                         st.success("✅ Conectado com sucesso! Atualizando o sistema...")
                         st.rerun()
                     else:
-                        st.error(f"Erro ao gerar token. Detalhes: {response.text}")
-            else:
-                st.warning("Por favor, cole a URL de retorno antes de clicar no botão.")
+                        st.error(f"Erro na resposta do Mercado Livre: {response.text}")
+            except requests.exceptions.ConnectionError:
+                st.error("🌐 Erro de Conexão (DNS/Rede): O servidor do Streamlit falhou temporariamente ao tentar falar com a API do Mercado Livre. Por favor, clique no botão novamente em instantes.")
+            except Exception as e:
+                st.error(f"Erro inesperado ao processar o token: {e}")
+        else:
+            st.warning("Por favor, cole a URL de retorno antes de clicar no botão.")
