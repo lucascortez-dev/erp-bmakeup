@@ -465,7 +465,7 @@ elif menu == "Integracao ML":
     if auth_code and not is_connected:
         with st.spinner("A ligar através da ponte segura do Supabase..."):
             # Substitua <seu-projeto-id> pelo ID real do seu projeto Supabase
-            edge_function_url = "https://<seu-projeto-id>.supabase.co/functions/v1/exchange-ml-token"
+            edge_function_url = "https://gcjyhaamliodpcdphwsg.supabase.co/functions/v1/exchange-ml-token"
             
             payload = {
                 "code": auth_code,
