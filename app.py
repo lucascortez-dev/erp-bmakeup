@@ -470,25 +470,32 @@ elif menu == "Integracao ML":
                 import json
                 import ssl
 
-                # 1. Resolve o IP da API dinamicamente via DNS seguro para contornar o bloqueio do servidor
-                dns_res_url = "https://dns.google/resolve?name=api.mercadolivre.com&type=A"
-                req_dns = urllib.request.Request(dns_res_url, headers={"User-Agent": "Mozilla/5.0"})
+                # Consulta direta ao DNS da Cloudflare via IP para contornar o bloqueio do servidor
+                doh_url = "https://1.1.1.1/dns-query?name=api.mercadolivre.com&type=A"
+                req_doh = urllib.request.Request(
+                    doh_url, 
+                    headers={
+                        "Accept": "application/dns-json",
+                        "User-Agent": "Mozilla/5.0"
+                    }
+                )
                 
-                resolved_ip = None
-                with urllib.request.urlopen(req_dns, timeout=10) as dns_resp:
-                    dns_data = json.loads(dns_resp.read().decode("utf-8"))
-                    if "Answer" in dns_data:
-                        for record in dns_data["Answer"]:
-                            if record.get("type") == 1: # Tipo A (IPv4)
-                                resolved_ip = record.get("data")
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+
+                ml_ip = None
+                with urllib.request.urlopen(req_doh, context=ctx, timeout=10) as doh_resp:
+                    doh_data = json.loads(doh_resp.read().decode("utf-8"))
+                    if "Answer" in doh_data:
+                        for ans in doh_data["Answer"]:
+                            if ans.get("type") == 1:
+                                ml_ip = ans.get("data")
                                 break
                 
-                if not resolved_ip:
-                    # Fallback caso o DNS dinâmico falhe
-                    resolved_ip = "api.mercadolivre.com"
+                target_host = ml_ip if ml_ip else "api.mercadolivre.com"
+                token_url = f"https://{target_host}/oauth/token"
 
-                # 2. Executa a troca do token utilizando o endereço obtido
-                token_url = f"https://{resolved_ip}/oauth/token"
                 payload = {
                     "grant_type": "authorization_code",
                     "client_id": ML_APP_ID,
@@ -499,10 +506,6 @@ elif menu == "Integracao ML":
                 
                 data_encoded = urllib.parse.urlencode(payload).encode("utf-8")
                 
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-
                 req = urllib.request.Request(
                     token_url, 
                     data=data_encoded, 
