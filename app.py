@@ -450,57 +450,16 @@ elif menu == "Integracao ML":
         st.error(f"Erro ao carregar as chaves do Mercado Livre no st.secrets: {e}")
         st.stop()
 
-    # Verifica se existe token no banco e realiza a renovação automática se necessário
-    is_connected = False
-    access_token = None
-    
+    # Verifica se existe token no banco
     try:
         tokens_data = supabase.table("ml_tokens").select("*").execute().data
-        if tokens_data:
-            access_token = tokens_data[0].get("access_token")
-            refresh_token = tokens_data[0].get("refresh_token")
-            
-            headers_test = {"Authorization": f"Bearer {access_token}"}
-            test_resp = requests.get("https://api.mercadolibre.com/users/me", headers=headers_test, timeout=10)
-            
-            if test_resp.status_code == 401 and refresh_token:
-                refresh_url = "https://api.mercadolivre.com/oauth/token"
-                payload_ref = {
-                    "grant_type": "refresh_token",
-                    "client_id": ML_APP_ID,
-                    "client_secret": ML_CLIENT_SECRET,
-                    "refresh_token": refresh_token
-                }
-                ref_resp = requests.post(refresh_url, data=payload_ref, timeout=10)
-                
-                if ref_resp.status_code == 200:
-                    new_data = ref_resp.json()
-                    access_token = new_data.get("access_token")
-                    refresh_token = new_data.get("refresh_token", refresh_token)
-                    
-                    supabase.table("ml_tokens").upsert({
-                        "id": 1, 
-                        "access_token": access_token, 
-                        "refresh_token": refresh_token
-                    }).execute()
-                    is_connected = True
-                else:
-                    is_connected = False
-            elif test_resp.status_code == 200:
-                is_connected = True
-            else:
-                is_connected = False
-        else:
-            is_connected = False
+        is_connected = len(tokens_data) > 0
     except Exception:
-        # Se houver oscilação pontual de rede mas o token existir, mantém a sessão ativa
-        if access_token:
-            is_connected = True
-        else:
-            is_connected = False
+        is_connected = False
 
     if is_connected:
-        st.success("✅ STATUS: Conectado ao Mercado Livre com Sucesso! (Autônomo Ativo)")
+        st.success("✅ STATUS: Conectado ao Mercado Livre com Sucesso!")
+        access_token = tokens_data[0]["access_token"]
         
         st.markdown("---")
         st.subheader("🔄 Sincronização de Catálogo e Financeiro")
@@ -624,9 +583,7 @@ elif menu == "Integracao ML":
         codigo_url = st.text_input("Cole a URL de retorno aqui:")
         
         if st.button("Gerar Token de Acesso"):
-            if not codigo_url:
-                st.warning("Por favor, cole a URL de retorno antes de clicar no botão.")
-            else:
+            if codigo_url:
                 if "code=" in codigo_url:
                     code = codigo_url.split("code=")[1].split("&")[0]
                 else:
@@ -641,30 +598,27 @@ elif menu == "Integracao ML":
                         "code": code,
                         "redirect_uri": ML_REDIRECT_URI
                     }
-                    # Cabeçalhos rigorosos exigidos pela API para evitar bloqueios de socket/DNS na nuvem
                     headers = {
                         "accept": "application/json",
-                        "content-type": "application/x-www-form-urlencoded",
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                        "content-type": "application/x-www-form-urlencoded"
                     }
                     
-                    try:
-                        response = requests.post(token_url, data=payload, headers=headers, timeout=25)
+                    response = requests.post(token_url, data=payload, headers=headers)
+                    
+                    if response.status_code == 200:
+                        token_data = response.json()
+                        access_token = token_data.get("access_token")
+                        refresh_token = token_data.get("refresh_token")
                         
-                        if response.status_code == 200:
-                            token_data = response.json()
-                            access_token = token_data.get("access_token")
-                            refresh_token = token_data.get("refresh_token")
-                            
-                            supabase.table("ml_tokens").upsert({
-                                "id": 1, 
-                                "access_token": access_token, 
-                                "refresh_token": refresh_token
-                            }).execute()
-                            
-                            st.success("✅ Conectado com sucesso! Atualizando o sistema...")
-                            st.rerun()
-                        else:
-                            st.error(f"Erro na resposta do Mercado Livre (Status {response.status_code}): {response.text}")
-                    except requests.exceptions.RequestException as e:
-                        st.error(f"Erro de comunicação com a API: {e}")
+                        supabase.table("ml_tokens").upsert({
+                            "id": 1, 
+                            "access_token": access_token, 
+                            "refresh_token": refresh_token
+                        }).execute()
+                        
+                        st.success("✅ Conectado com sucesso! Atualizando o sistema...")
+                        st.rerun()
+                    else:
+                        st.error(f"Erro ao gerar token. Detalhes: {response.text}")
+            else:
+                st.warning("Por favor, cole a URL de retorno antes de clicar no botão.")
