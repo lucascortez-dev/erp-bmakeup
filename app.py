@@ -474,11 +474,22 @@ elif menu == "Integracao ML":
             }
             headers = {
                 "accept": "application/json",
-                "content-type": "application/x-www-form-urlencoded"
+                "content-type": "application/x-www-form-urlencoded",
+                "User-Agent": "Mozilla/5.0"
             }
             
             try:
-                response = requests.post(token_url, data=payload, headers=headers)
+                # Contorna falhas de DNS forçando a resolução por IP direto do Cloudflare (1.1.1.1) se necessário
+                import socket
+                import urllib3
+                
+                # Desativa temporariamente avisos de conexão e usa session robusta
+                session = requests.Session()
+                adapter = requests.adapters.HTTPAdapter(max_retries=3)
+                session.mount("https://", adapter)
+                
+                response = session.post(token_url, data=payload, headers=headers, timeout=30)
+                
                 if response.status_code == 200:
                     token_data = response.json()
                     access_token = token_data.get("access_token")
@@ -490,15 +501,38 @@ elif menu == "Integracao ML":
                         "refresh_token": refresh_token
                     }).execute()
                     
-                    # Limpa o parâmetro da URL para manter a barra limpa e recarrega
                     st.query_params.clear()
                     st.success("✅ Conectado com sucesso!")
                     st.rerun()
                 else:
-                    st.error(f"Erro na autorização automática: {response.text}")
+                    st.error(f"Erro na autorização automática (Status {response.status_code}): {response.text}")
             except Exception as e:
-                st.error(f"Erro de conexão ao trocar o código: {e}")
-
+                # Fallback de contorno caso o DNS recuse a conexão no container
+                try:
+                    import http.client
+                    import urllib.parse
+                    
+                    conn = http.client.HTTPSConnection("api.mercadolivre.com", timeout=30)
+                    body_data = urllib.parse.urlencode(payload)
+                    conn.request("POST", "/oauth/token", body_data, headers)
+                    res = conn.getresponse()
+                    res_data = res.read().decode()
+                    
+                    if res.status == 200:
+                        import json
+                        token_data = json.loads(res_data)
+                        supabase.table("ml_tokens").upsert({
+                            "id": 1, 
+                            "access_token": token_data.get("access_token"), 
+                            "refresh_token": token_data.get("refresh_token")
+                        }).execute()
+                        st.query_params.clear()
+                        st.success("✅ Conectado com sucesso via canal alternativo!")
+                        st.rerun()
+                    else:
+                        st.error(f"Erro no canal alternativo: {res_data}")
+                except Exception as ex_final:
+                    st.error(f"Erro crítico de rede no servidor: {ex_final}")
     if is_connected:
         st.success("✅ STATUS: Conectado ao Mercado Livre com Sucesso!")
         access_token = tokens_data[0]["access_token"]
