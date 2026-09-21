@@ -465,63 +465,32 @@ elif menu == "Integracao ML":
     if auth_code and not is_connected:
         with st.spinner("A estabelecer ligação automática com o Mercado Livre..."):
             try:
-                import urllib.request
-                import urllib.parse
+                import subprocess
                 import json
-                import ssl
-
-                # Consulta direta ao DNS da Cloudflare via IP para contornar o bloqueio do servidor
-                doh_url = "https://1.1.1.1/dns-query?name=api.mercadolivre.com&type=A"
-                req_doh = urllib.request.Request(
-                    doh_url, 
-                    headers={
-                        "Accept": "application/dns-json",
-                        "User-Agent": "Mozilla/5.0"
-                    }
-                )
+                import urllib.parse
                 
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-
-                ml_ip = None
-                with urllib.request.urlopen(req_doh, context=ctx, timeout=10) as doh_resp:
-                    doh_data = json.loads(doh_resp.read().decode("utf-8"))
-                    if "Answer" in doh_data:
-                        for ans in doh_data["Answer"]:
-                            if ans.get("type") == 1:
-                                ml_ip = ans.get("data")
-                                break
-                
-                target_host = ml_ip if ml_ip else "api.mercadolivre.com"
-                token_url = f"https://{target_host}/oauth/token"
-
-                payload = {
+                # Codifica os dados do formulário OAuth2
+                form_data = urllib.parse.urlencode({
                     "grant_type": "authorization_code",
                     "client_id": ML_APP_ID,
                     "client_secret": ML_CLIENT_SECRET,
                     "code": auth_code,
                     "redirect_uri": ML_REDIRECT_URI
-                }
+                })
                 
-                data_encoded = urllib.parse.urlencode(payload).encode("utf-8")
+                # Executa o pedido POST através do comando curl nativo do servidor
+                cmd = [
+                    "curl", "-s", "-X", "POST",
+                    "https://api.mercadolivre.com/oauth/token",
+                    "-H", "accept: application/json",
+                    "-H", "content-type: application/x-www-form-urlencoded",
+                    "-d", form_data
+                ]
                 
-                req = urllib.request.Request(
-                    token_url, 
-                    data=data_encoded, 
-                    headers={
-                        "Accept": "application/json",
-                        "Content-Type": "application/x-www-form-urlencoded",
-                        "Host": "api.mercadolivre.com",
-                        "User-Agent": "Mozilla/5.0"
-                    },
-                    method="POST"
-                )
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
                 
-                with urllib.request.urlopen(req, context=ctx, timeout=30) as response:
-                    res_body = response.read().decode("utf-8")
-                    token_data = json.loads(res_body)
-                    
+                if result.returncode == 0 and result.stdout:
+                    token_data = json.loads(result.stdout)
                     access_token = token_data.get("access_token")
                     refresh_token = token_data.get("refresh_token")
                     
@@ -536,9 +505,11 @@ elif menu == "Integracao ML":
                         st.success("✅ Ligação estabelecida com sucesso!")
                         st.rerun()
                     else:
-                        st.error(f"Resposta inválida da plataforma: {res_body}")
+                        st.error(f"Erro retornado pela plataforma: {result.stdout}")
+                else:
+                    st.error(f"Falha na comunicação de rede: {result.stderr or 'Sem resposta do servidor'}")
             except Exception as e:
-                st.error(f"Erro ao concluir a autenticação automática: {e}")
+                st.error(f"Erro crítico ao processar a autenticação: {e}")
     if is_connected:
         st.success("✅ STATUS: Conectado ao Mercado Livre com Sucesso!")
         access_token = tokens_data[0]["access_token"]
