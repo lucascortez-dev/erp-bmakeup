@@ -641,15 +641,15 @@ elif menu == "Integracao ML":
                         "code": code,
                         "redirect_uri": ML_REDIRECT_URI
                     }
+                    # Cabeçalhos rigorosos exigidos pela API para evitar bloqueios de socket/DNS na nuvem
                     headers = {
                         "accept": "application/json",
                         "content-type": "application/x-www-form-urlencoded",
-                        "User-Agent": "Mozilla/5.0"
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                     }
                     
                     try:
-                        # Força o uso de um DNS público e desativa verificações restritas que causam o gaierror
-                        response = requests.post(token_url, data=payload, headers=headers, timeout=20)
+                        response = requests.post(token_url, data=payload, headers=headers, timeout=25)
                         
                         if response.status_code == 200:
                             token_data = response.json()
@@ -665,8 +665,6 @@ elif menu == "Integracao ML":
                             st.success("✅ Conectado com sucesso! Atualizando o sistema...")
                             st.rerun()
                         else:
-                            st.error(f"Erro ao gerar token. Detalhes: {response.text}")
-                    except Exception as e:
-                        # Fallback inteligente caso o DNS do Streamlit bloqueie a URL direta
-                        st.error(f"Erro de conexão com a API do Mercado Livre: {e}")
-                        st.info("💡 Dica de contorno: Se o Streamlit Cloud persistir com o bloqueio de rede para esta API externa, você pode inserir o token gerado diretamente na tabela 'ml_tokens' do seu Supabase para liberar o ERP instantaneamente.")
+                            st.error(f"Erro na resposta do Mercado Livre (Status {response.status_code}): {response.text}")
+                    except requests.exceptions.RequestException as e:
+                        st.error(f"Erro de comunicação com a API: {e}")
