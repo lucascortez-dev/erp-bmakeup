@@ -586,7 +586,10 @@ elif menu == "Integracao ML":
         codigo_url = st.text_input("https://erp-bmakeup.streamlit.app")
         
         if st.button("Gerar Token de Acesso"):
-            if codigo_url:
+        if not codigo_url:
+            st.warning("Por favor, cole a URL de retorno antes de clicar no botão.")
+        else:
+            # Extração limpa e direta sem blocos aninhados complexos
             if "code=" in codigo_url:
                 code = codigo_url.split("code=")[1].split("&")[0]
             else:
@@ -623,5 +626,3 @@ elif menu == "Integracao ML":
                     st.rerun()
                 else:
                     st.error(f"Erro ao gerar token. Detalhes: {response.text}")
-        else:
-            st.warning("Por favor, cole a URL de retorno antes de clicar no botão.")
