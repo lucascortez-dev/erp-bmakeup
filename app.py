@@ -463,34 +463,23 @@ elif menu == "Integracao ML":
 
     # Se veio um código de autorização na URL e ainda não estamos conectados, faz a troca automática agora
     if auth_code and not is_connected:
-        with st.spinner("A estabelecer ligação automática com o Mercado Livre..."):
+        with st.spinner("A ligar através da ponte segura do Supabase..."):
+            # Substitua <seu-projeto-id> pelo ID real do seu projeto Supabase
+            edge_function_url = "https://<seu-projeto-id>.supabase.co/functions/v1/exchange-ml-token"
+            
+            payload = {
+                "code": auth_code,
+                "client_id": ML_APP_ID,
+                "client_secret": ML_CLIENT_SECRET,
+                "redirect_uri": ML_REDIRECT_URI
+            }
+            
             try:
-                import subprocess
-                import json
-                import urllib.parse
+                # O Streamlit comunica livremente com o Supabase, que por sua vez acede à API do Mercado Livre
+                response = requests.post(edge_function_url, json=payload, timeout=30)
                 
-                # Codifica os dados do formulário OAuth2
-                form_data = urllib.parse.urlencode({
-                    "grant_type": "authorization_code",
-                    "client_id": ML_APP_ID,
-                    "client_secret": ML_CLIENT_SECRET,
-                    "code": auth_code,
-                    "redirect_uri": ML_REDIRECT_URI
-                })
-                
-                # Executa o pedido POST através do comando curl nativo do servidor
-                cmd = [
-                    "curl", "-s", "-X", "POST",
-                    "https://api.mercadolivre.com/oauth/token",
-                    "-H", "accept: application/json",
-                    "-H", "content-type: application/x-www-form-urlencoded",
-                    "-d", form_data
-                ]
-                
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-                
-                if result.returncode == 0 and result.stdout:
-                    token_data = json.loads(result.stdout)
+                if response.status_code == 200:
+                    token_data = response.json()
                     access_token = token_data.get("access_token")
                     refresh_token = token_data.get("refresh_token")
                     
@@ -505,11 +494,11 @@ elif menu == "Integracao ML":
                         st.success("✅ Ligação estabelecida com sucesso!")
                         st.rerun()
                     else:
-                        st.error(f"Erro retornado pela plataforma: {result.stdout}")
+                        st.error(f"Resposta inválida: {token_data}")
                 else:
-                    st.error(f"Falha na comunicação de rede: {result.stderr or 'Sem resposta do servidor'}")
+                    st.error(f"Erro na troca via Supabase (Estado {response.status_code}): {response.text}")
             except Exception as e:
-                st.error(f"Erro crítico ao processar a autenticação: {e}")
+                st.error(f"Erro de comunicação com a Edge Function: {e}")
     if is_connected:
         st.success("✅ STATUS: Conectado ao Mercado Livre com Sucesso!")
         access_token = tokens_data[0]["access_token"]
