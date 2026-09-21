@@ -463,9 +463,8 @@ elif menu == "Integracao ML":
 
     # Se veio um código de autorização na URL e ainda não estamos conectados, faz a troca automática agora
     if auth_code and not is_connected:
-        with st.spinner("A autenticar com o Mercado Livre..."):
-            # IP direto correspondente aos servidores da API do Mercado Livre para bypassar o DNS restrito da nuvem
-            token_url = "https://184.72.227.189/oauth/token" 
+        with st.spinner("A estabelecer ligação com o Mercado Livre..."):
+            token_url = "https://api.mercadolivre.com/oauth/token"
             payload = {
                 "grant_type": "authorization_code",
                 "client_id": ML_APP_ID,
@@ -478,12 +477,6 @@ elif menu == "Integracao ML":
                 import urllib.request
                 import urllib.parse
                 import json
-                import ssl
-                
-                # Contexto SSL para ignorar o alerta de IP direto no certificado de domínio
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
                 
                 data_encoded = urllib.parse.urlencode(payload).encode("utf-8")
                 req = urllib.request.Request(
@@ -492,13 +485,13 @@ elif menu == "Integracao ML":
                     headers={
                         "Accept": "application/json",
                         "Content-Type": "application/x-www-form-urlencoded",
-                        "Host": "api.mercadolivre.com",
-                        "User-Agent": "Mozilla/5.0"
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
                     },
                     method="POST"
                 )
                 
-                with urllib.request.urlopen(req, context=ctx, timeout=30) as response:
+                # Aumentamos o tempo limite para 45 segundos para garantir estabilidade na nuvem
+                with urllib.request.urlopen(req, timeout=45) as response:
                     res_body = response.read().decode("utf-8")
                     token_data = json.loads(res_body)
                     
@@ -513,10 +506,10 @@ elif menu == "Integracao ML":
                         }).execute()
                         
                         st.query_params.clear()
-                        st.success("✅ Conectado com sucesso!")
+                        st.success("✅ Ligação estabelecida com sucesso!")
                         st.rerun()
                     else:
-                        st.error(f"Resposta inválida: {res_body}")
+                        st.error(f"Resposta inválida da plataforma: {res_body}")
             except Exception as e:
                 st.error(f"Erro na troca do código de acesso: {e}")
     if is_connected:
