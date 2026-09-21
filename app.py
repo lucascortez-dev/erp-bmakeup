@@ -450,12 +450,54 @@ elif menu == "Integracao ML":
         st.error(f"Erro ao carregar as chaves do Mercado Livre no st.secrets: {e}")
         st.stop()
 
-    # Verifica se existe token no banco
+    # Captura automática do código de autorização direto da URL do navegador (sem colar nada)
+    query_params = st.query_params
+    auth_code = query_params.get("code")
+
+    # Verifica se já existe token salvo no banco Supabase
     try:
         tokens_data = supabase.table("ml_tokens").select("*").execute().data
         is_connected = len(tokens_data) > 0
     except Exception:
         is_connected = False
+
+    # Se veio um código de autorização na URL e ainda não estamos conectados, faz a troca automática agora
+    if auth_code and not is_connected:
+        with st.spinner("Autenticando automaticamente com o Mercado Livre..."):
+            token_url = "https://api.mercadolivre.com/oauth/token"
+            payload = {
+                "grant_type": "authorization_code",
+                "client_id": ML_APP_ID,
+                "client_secret": ML_CLIENT_SECRET,
+                "code": auth_code,
+                "redirect_uri": ML_REDIRECT_URI
+            }
+            headers = {
+                "accept": "application/json",
+                "content-type": "application/x-www-form-urlencoded"
+            }
+            
+            try:
+                response = requests.post(token_url, data=payload, headers=headers)
+                if response.status_code == 200:
+                    token_data = response.json()
+                    access_token = token_data.get("access_token")
+                    refresh_token = token_data.get("refresh_token")
+                    
+                    supabase.table("ml_tokens").upsert({
+                        "id": 1, 
+                        "access_token": access_token, 
+                        "refresh_token": refresh_token
+                    }).execute()
+                    
+                    # Limpa o parâmetro da URL para manter a barra limpa e recarrega
+                    st.query_params.clear()
+                    st.success("✅ Conectado com sucesso!")
+                    st.rerun()
+                else:
+                    st.error(f"Erro na autorização automática: {response.text}")
+            except Exception as e:
+                st.error(f"Erro de conexão ao trocar o código: {e}")
 
     if is_connected:
         st.success("✅ STATUS: Conectado ao Mercado Livre com Sucesso!")
@@ -472,17 +514,17 @@ elif menu == "Integracao ML":
         with col_sync1:
             if st.button("📦 Puxar Estoque Atualizado (ML)", use_container_width=True):
                 with st.spinner("Lendo catálogo do Mercado Livre..."):
-                    user_resp = requests.get("https://api.mercadolibre.com/users/me", headers=headers)
+                    user_resp = requests.get("https://api.mercadolivre.com/users/me", headers=headers)
                     if user_resp.status_code == 200:
                         user_id = user_resp.json().get("id")
-                        items_resp = requests.get(f"https://api.mercadolibre.com/users/{user_id}/items/search", headers=headers)
+                        items_resp = requests.get(f"https://api.mercadolivre.com/users/{user_id}/items/search", headers=headers)
                         
                         if items_resp.status_code == 200:
                             item_ids = items_resp.json().get("results", [])
                             produtos_salvos = 0
                             
                             for item_id in item_ids:
-                                detail_resp = requests.get(f"https://api.mercadolibre.com/items/{item_id}", headers=headers)
+                                detail_resp = requests.get(f"https://api.mercadolivre.com/items/{item_id}", headers=headers)
                                 if detail_resp.status_code == 200:
                                     prod = detail_resp.json()
                                     sku_val = prod.get("seller_custom_field")
@@ -515,10 +557,10 @@ elif menu == "Integracao ML":
         with col_sync2:
             if st.button("🛒 Puxar Vendas e Taxas (ML)", use_container_width=True):
                 with st.spinner("Processando financeiro item a item..."):
-                    user_resp = requests.get("https://api.mercadolibre.com/users/me", headers=headers)
+                    user_resp = requests.get("https://api.mercadolivre.com/users/me", headers=headers)
                     if user_resp.status_code == 200:
                         user_id = user_resp.json().get("id")
-                        orders_resp = requests.get(f"https://api.mercadolibre.com/orders/search?seller={user_id}", headers=headers)
+                        orders_resp = requests.get(f"https://api.mercadolivre.com/orders/search?seller={user_id}", headers=headers)
                         
                         if orders_resp.status_code == 200:
                             orders_list = orders_resp.json().get("results", [])
@@ -571,54 +613,23 @@ elif menu == "Integracao ML":
         st.markdown("---")
         if st.button("Desconectar Conta (Sair)"):
             supabase.table("ml_tokens").delete().eq("id", 1).execute()
+            st.query_params.clear()
             st.rerun()
 
     else:
         st.warning("⚠️ O ERP não está conectado ao Mercado Livre.")
-        st.write("Por favor, autorize o aplicativo para continuar.")
+        st.write("Por favor, clique no botão abaixo para autorizar o aplicativo:")
         
         auth_url = f"https://auth.mercadolivre.com.br/authorization?response_type=code&client_id={ML_APP_ID}&redirect_uri={ML_REDIRECT_URI}"
-        st.markdown(f"[👉 **CLIQUE AQUI PARA CONECTAR AO MERCADO LIVRE**]({auth_url})")
         
-        codigo_url = st.text_input("Cole a URL de retorno aqui:")
-        
-        if st.button("Gerar Token de Acesso"):
-            if codigo_url:
-                if "code=" in codigo_url:
-                    code = codigo_url.split("code=")[1].split("&")[0]
-                else:
-                    code = codigo_url.strip()
-                    
-                with st.spinner("Gerando chave de acesso..."):
-                    token_url = "https://api.mercadolivre.com/oauth/token"
-                    payload = {
-                        "grant_type": "authorization_code",
-                        "client_id": ML_APP_ID,
-                        "client_secret": ML_CLIENT_SECRET,
-                        "code": code,
-                        "redirect_uri": ML_REDIRECT_URI
-                    }
-                    headers = {
-                        "accept": "application/json",
-                        "content-type": "application/x-www-form-urlencoded"
-                    }
-                    
-                    response = requests.post(token_url, data=payload, headers=headers)
-                    
-                    if response.status_code == 200:
-                        token_data = response.json()
-                        access_token = token_data.get("access_token")
-                        refresh_token = token_data.get("refresh_token")
-                        
-                        supabase.table("ml_tokens").upsert({
-                            "id": 1, 
-                            "access_token": access_token, 
-                            "refresh_token": refresh_token
-                        }).execute()
-                        
-                        st.success("✅ Conectado com sucesso! Atualizando o sistema...")
-                        st.rerun()
-                    else:
-                        st.error(f"Erro ao gerar token. Detalhes: {response.text}")
-            else:
-                st.warning("Por favor, cole a URL de retorno antes de clicar no botão.")
+        # Botão estilizado para imitar a ação direta de conexão
+        st.markdown(
+            f"""
+            <div style="text-align: center; margin-top: 20px; margin-bottom: 20px;">
+                <a href="{auth_url}" target="_self" style="background-color: #ffe600; color: #333333; padding: 12px 24px; text-decoration: none; font-weight: bold; border-radius: 5px; font-size: 16px; box-shadow: 0px 2px 5px rgba(0,0,0,0.1);">
+                    🔗 Conectar ao Mercado Livre
+                </a>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
