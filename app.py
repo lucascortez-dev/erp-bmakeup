@@ -12,7 +12,10 @@ try:
     url = st.secrets["SUPABASE_URL"]
     key = st.secrets["SUPABASE_KEY"]
     supabase = create_client(url, key)
-    except Exception:
+    response = requests.post(...)
+except Exception as e:
+    st.error(f"Erro crítico: {e}")
+
     # Caso as secrets não estejam configuradas, ele avisa (nunca deixe a chave real exposta aqui!)
     SUPABASE_URL = "https://gcjyhaamliodpcdphwsg.supabase.co"
     SUPABASE_KEY = "CHAVE_AUSENTE_NO_COFRE" 
