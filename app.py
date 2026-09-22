@@ -464,25 +464,24 @@ elif menu == "Integracao ML":
         is_connected = False
 
     if auth_code and not is_connected:
-        with st.spinner("A ligar através da ponte segura do Supabase..."):
-            edge_function_url = "https://gcjyhaamliodpcdphwsg.supabase.co/functions/v1/exchange-ml-token"
-            supabase_key = SUPABASE_KEY 
+        with st.spinner("A estabelecer ligação com o Mercado Livre..."):
+            token_url = "https://api.mercadolivre.com/oauth/token"
             
             payload = {
-                "code": auth_code,
+                "grant_type": "authorization_code",
                 "client_id": ML_APP_ID,
                 "client_secret": ML_CLIENT_SECRET,
+                "code": auth_code,
                 "redirect_uri": ML_REDIRECT_URI
             }
             
             headers = {
-                "apikey": supabase_key,
-                "Authorization": f"Bearer {supabase_key}",
-                "Content-Type": "application/json"
+                "accept": "application/json",
+                "content-type": "application/x-www-form-urlencoded"
             }
             
             try:
-                response = requests.post(edge_function_url, json=payload, headers=headers, timeout=30)
+                response = requests.post(token_url, data=payload, headers=headers, timeout=30)
                 
                 if response.status_code == 200:
                     token_data = response.json()
@@ -502,9 +501,9 @@ elif menu == "Integracao ML":
                     else:
                         st.error(f"Resposta inválida: {token_data}")
                 else:
-                    st.error(f"Erro na troca via Supabase (Estado {response.status_code}): {response.text}")
+                    st.error(f"Erro na autorização (Estado {response.status_code}): {response.text}")
             except Exception as e:
-                st.error(f"Erro de comunicação com a Edge Function: {e}")
+                st.error(f"Erro de comunicação: {e}")
 
     if is_connected:
         st.success("✅ STATUS: Conectado ao Mercado Livre com Sucesso!")
