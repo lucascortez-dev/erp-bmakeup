@@ -3,15 +3,16 @@ import pandas as pd
 from datetime import datetime, timedelta
 import os
 import requests
-from supabase import create_client, Client
+from supabase import create_client
 
 # ==========================================
 # LENDO CHAVES DO COFRE (SECRETS)
 # ==========================================
 try:
-    SUPABASE_URL = st.secrets["SUPABASE_URL"]
-    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-except Exception:
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    supabase = create_client(url, key)
+    except Exception:
     # Caso as secrets não estejam configuradas, ele avisa (nunca deixe a chave real exposta aqui!)
     SUPABASE_URL = "https://gcjyhaamliodpcdphwsg.supabase.co"
     SUPABASE_KEY = "CHAVE_AUSENTE_NO_COFRE" 
