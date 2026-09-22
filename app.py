@@ -3,7 +3,11 @@ import pandas as pd
 from datetime import datetime, timedelta
 import os
 import requests
+import urllib3
 from supabase import create_client
+
+# Desativa avisos de certificado SSL ao conectar diretamente via IP
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ==========================================
 # LEITURA ROBUSTA DE SEGREDOS (RENDER / STREAMLIT)
@@ -441,7 +445,7 @@ elif menu == "Controle de Estoque":
         st.info("Estoque vazio.")
 
 # -------------------------------------------------------------
-# ABA: INTEGRAÇÃO MERCADO LIVRE (RESOLUÇÃO DINÂMICA VIA CLOUDFLARE)
+# ABA: INTEGRAÇÃO MERCADO LIVRE (RESOLUÇÃO VIA IP DO GOOGLE DNS)
 # -------------------------------------------------------------
 elif menu == "Integracao ML":
     st.title("Integração Oficial - Mercado Livre")
@@ -466,15 +470,23 @@ elif menu == "Integracao ML":
     if auth_code and not is_connected:
         with st.spinner("A estabelecer ligação segura com o Mercado Livre..."):
             try:
-                # Resolve o IP via DNS-over-HTTPS da Cloudflare para contornar restrições de DNS do Render
-                dns_res = requests.get("https://cloudflare-dns.com/dns-query?name=api.mercadolivre.com&type=A", headers={"Accept": "application/json"}, timeout=10)
+                # Resolve o IP utilizando diretamente o IP do Google DNS (8.8.8.8) para evitar o bloqueio de DNS do Render
                 target_ip = "api.mercadolivre.com"
-                if dns_res.status_code == 200:
-                    dns_data = dns_res.json()
-                    if "Answer" in dns_data:
-                        record = next((r for r in dns_data["Answer"] if r.get("type") == 1), None)
-                        if record:
-                            target_ip = record.get("data")
+                try:
+                    dns_res = requests.get(
+                        "https://8.8.8.8/resolve",
+                        params={"name": "api.mercadolivre.com", "type": "A"},
+                        timeout=5,
+                        verify=False
+                    )
+                    if dns_res.status_code == 200:
+                        dns_data = dns_res.json()
+                        for record in dns_data.get("Answer", []):
+                            if record.get("type") == 1:
+                                target_ip = record.get("data")
+                                break
+                except Exception:
+                    pass
 
                 token_url = f"https://{target_ip}/oauth/token"
                 
@@ -492,7 +504,8 @@ elif menu == "Integracao ML":
                     "Host": "api.mercadolivre.com"
                 }
                 
-                response = requests.post(token_url, data=payload, headers=headers, timeout=30)
+                # verify=False é obrigatório ao saltar a resolução DNS e ligar diretamente por IP com Host header
+                response = requests.post(token_url, data=payload, headers=headers, timeout=30, verify=False)
                 
                 if response.status_code == 200:
                     token_data = response.json()
@@ -531,17 +544,17 @@ elif menu == "Integracao ML":
         with col_sync1:
             if st.button("📦 Puxar Estoque Atualizado (ML)", use_container_width=True):
                 with st.spinner("Lendo catálogo do Mercado Livre..."):
-                    user_resp = requests.get("https://api.mercadolivre.com/users/me", headers=headers)
+                    user_resp = requests.get("https://api.mercadolivre.com/users/me", headers=headers, verify=False)
                     if user_resp.status_code == 200:
                         user_id = user_resp.json().get("id")
-                        items_resp = requests.get(f"https://api.mercadolivre.com/users/{user_id}/items/search", headers=headers)
+                        items_resp = requests.get(f"https://api.mercadolivre.com/users/{user_id}/items/search", headers=headers, verify=False)
                         
                         if items_resp.status_code == 200:
                             item_ids = items_resp.json().get("results", [])
                             produtos_salvos = 0
                             
                             for item_id in item_ids:
-                                detail_resp = requests.get(f"https://api.mercadolivre.com/items/{item_id}", headers=headers)
+                                detail_resp = requests.get(f"https://api.mercadolivre.com/items/{item_id}", headers=headers, verify=False)
                                 if detail_resp.status_code == 200:
                                     prod = detail_resp.json()
                                     sku_val = prod.get("seller_custom_field")
@@ -574,10 +587,10 @@ elif menu == "Integracao ML":
         with col_sync2:
             if st.button("🛒 Puxar Vendas e Taxas (ML)", use_container_width=True):
                 with st.spinner("Processando financeiro item a item..."):
-                    user_resp = requests.get("https://api.mercadolivre.com/users/me", headers=headers)
+                    user_resp = requests.get("https://api.mercadolivre.com/users/me", headers=headers, verify=False)
                     if user_resp.status_code == 200:
                         user_id = user_resp.json().get("id")
-                        orders_resp = requests.get(f"https://api.mercadolivre.com/orders/search?seller={user_id}", headers=headers)
+                        orders_resp = requests.get(f"https://api.mercadolivre.com/orders/search?seller={user_id}", headers=headers, verify=False)
                         
                         if orders_resp.status_code == 200:
                             orders_list = orders_resp.json().get("results", [])
