@@ -465,23 +465,34 @@ elif menu == "Integracao ML":
 
     # TROCA DIRETA DO TOKEN (SEM SUPABASE EDGE FUNCTION)
     if auth_code and not is_connected:
-        with st.spinner("A estabelecer ligação direta com o Mercado Livre..."):
-            token_url = "https://api.mercadolivre.com/oauth/token"
-            
-            payload = {
-                "grant_type": "authorization_code",
-                "client_id": ML_APP_ID,
-                "client_secret": ML_CLIENT_SECRET,
-                "code": auth_code,
-                "redirect_uri": ML_REDIRECT_URI
-            }
-            
-            headers = {
-                "accept": "application/json",
-                "content-type": "application/x-www-form-urlencoded"
-            }
-            
+        with st.spinner("A estabelecer ligação segura com o Mercado Livre..."):
             try:
+                # Resolve o IP dinamicamente via DNS-over-HTTPS da Cloudflare para contornar falhas de DNS no Render
+                dns_res = requests.get("https://cloudflare-dns.com/dns-query?name=api.mercadolivre.com&type=A", headers={"Accept": "application/dns-json"}, timeout=10)
+                target_ip = "api.mercadolivre.com"
+                if dns_res.status_code == 200:
+                    dns_data = dns_res.json()
+                    if "Answer" in dns_data:
+                        record = next((r for r in dns_data["Answer"] if r.get("type") == 1), None)
+                        if record:
+                            target_ip = record.get("data")
+
+                token_url = f"https://{target_ip}/oauth/token"
+                
+                payload = {
+                    "grant_type": "authorization_code",
+                    "client_id": ML_APP_ID,
+                    "client_secret": ML_CLIENT_SECRET,
+                    "code": auth_code,
+                    "redirect_uri": ML_REDIRECT_URI
+                }
+                
+                headers = {
+                    "accept": "application/json",
+                    "content-type": "application/x-www-form-urlencoded",
+                    "Host": "api.mercadolivre.com"
+                }
+                
                 response = requests.post(token_url, data=payload, headers=headers, timeout=30)
                 
                 if response.status_code == 200:
