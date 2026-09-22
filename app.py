@@ -6,14 +6,25 @@ import requests
 from supabase import create_client
 
 # ==========================================
-# LENDO CHAVES DO COFRE (SECRETS) E CONEXÃO
+# LEITURA ROBUSTA DE SEGREDOS (RENDER / STREAMLIT)
 # ==========================================
+def obter_segredo(chave, padrao=""):
+    try:
+        if chave in st.secrets:
+            return st.secrets[chave]
+    except Exception:
+        pass
+    return os.environ.get(chave, padrao)
+
+SUPABASE_URL = obter_segredo("SUPABASE_URL")
+SUPABASE_KEY = obter_segredo("SUPABASE_KEY")
+
 @st.cache_resource
 def init_connection():
     try:
-        url = st.secrets["SUPABASE_URL"]
-        key = st.secrets["SUPABASE_KEY"]
-        return create_client(url, key)
+        if not SUPABASE_URL or not SUPABASE_KEY:
+            raise ValueError("As credenciais do Supabase não foram encontradas nas variáveis de ambiente ou segredos.")
+        return create_client(SUPABASE_URL, SUPABASE_KEY)
     except Exception as e:
         st.error(f"Erro crítico ao carregar as credenciais do Supabase: {e}")
         return None
@@ -435,12 +446,12 @@ elif menu == "Controle de Estoque":
 elif menu == "Integracao ML":
     st.title("Integração Oficial - Mercado Livre")
     
-    try:
-        ML_APP_ID = st.secrets["ML_APP_ID"]
-        ML_CLIENT_SECRET = st.secrets["ML_CLIENT_SECRET"]
-        ML_REDIRECT_URI = st.secrets["ML_REDIRECT_URI"]
-    except Exception as e:
-        st.error(f"Erro ao carregar as chaves do Mercado Livre no st.secrets: {e}")
+    ML_APP_ID = obter_segredo("ML_APP_ID")
+    ML_CLIENT_SECRET = obter_segredo("ML_CLIENT_SECRET")
+    ML_REDIRECT_URI = obter_segredo("ML_REDIRECT_URI")
+
+    if not ML_APP_ID or not ML_CLIENT_SECRET:
+        st.error("Erro: As chaves do Mercado Livre não foram configuradas nas variáveis de ambiente.")
         st.stop()
 
     query_params = st.query_params
@@ -455,7 +466,7 @@ elif menu == "Integracao ML":
     if auth_code and not is_connected:
         with st.spinner("A ligar através da ponte segura do Supabase..."):
             edge_function_url = "https://gcjyhaamliodpcdphwsg.supabase.co/functions/v1/exchange-ml-token"
-            supabase_key = st.secrets["SUPABASE_KEY"] 
+            supabase_key = SUPABASE_KEY 
             
             payload = {
                 "code": auth_code,
