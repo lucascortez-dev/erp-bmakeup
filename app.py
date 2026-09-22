@@ -6,25 +6,16 @@ import requests
 from supabase import create_client
 
 # ==========================================
-# LENDO CHAVES DO COFRE (SECRETS)
+# LENDO CHAVES DO COFRE (SECRETS) E CONEXÃO
 # ==========================================
-try:
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
-    supabase = create_client(url, key)
-    response = requests.post(...)
-except Exception as e:
-    st.error(f"Erro crítico: {e}")
-
-    # Caso as secrets não estejam configuradas, ele avisa (nunca deixe a chave real exposta aqui!)
-    SUPABASE_URL = "https://gcjyhaamliodpcdphwsg.supabase.co"
-    SUPABASE_KEY = "CHAVE_AUSENTE_NO_COFRE" 
-
 @st.cache_resource
 def init_connection():
     try:
-        return create_client(SUPABASE_URL, SUPABASE_KEY)
+        url = st.secrets["SUPABASE_URL"]
+        key = st.secrets["SUPABASE_KEY"]
+        return create_client(url, key)
     except Exception as e:
+        st.error(f"Erro crítico ao carregar as credenciais do Supabase: {e}")
         return None
 
 supabase = init_connection()
@@ -182,7 +173,6 @@ if st.sidebar.button("🛒  Registrar Venda", use_container_width=True): st.sess
 if st.sidebar.button("💡  Simulador de Lucro", use_container_width=True): st.session_state.menu_atual = "Simulador de Lucro por Venda"; st.rerun()
 if st.sidebar.button("📋  Controle de Estoque", use_container_width=True): st.session_state.menu_atual = "Controle de Estoque"; st.rerun()
 
-# Nova seção para a Integração do Mercado Livre
 st.sidebar.markdown("<br><br>", unsafe_allow_html=True)
 st.sidebar.markdown("<p style='font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;'>Configurações</p>", unsafe_allow_html=True)
 if st.sidebar.button("🔌 Integração Mercado Livre", use_container_width=True): st.session_state.menu_atual = "Integracao ML"; st.rerun()
@@ -445,7 +435,6 @@ elif menu == "Controle de Estoque":
 elif menu == "Integracao ML":
     st.title("Integração Oficial - Mercado Livre")
     
-    # Pega as chaves do cofre do Streamlit
     try:
         ML_APP_ID = st.secrets["ML_APP_ID"]
         ML_CLIENT_SECRET = st.secrets["ML_CLIENT_SECRET"]
@@ -454,24 +443,18 @@ elif menu == "Integracao ML":
         st.error(f"Erro ao carregar as chaves do Mercado Livre no st.secrets: {e}")
         st.stop()
 
-    # Captura automática do código de autorização direto da URL do navegador (sem colar nada)
     query_params = st.query_params
     auth_code = query_params.get("code")
 
-    # Verifica se já existe token salvo no banco Supabase
     try:
         tokens_data = supabase.table("ml_tokens").select("*").execute().data
         is_connected = len(tokens_data) > 0
     except Exception:
         is_connected = False
 
-    # Se veio um código de autorização na URL e ainda não estamos conectados, faz a troca automática agora
     if auth_code and not is_connected:
         with st.spinner("A ligar através da ponte segura do Supabase..."):
             edge_function_url = "https://gcjyhaamliodpcdphwsg.supabase.co/functions/v1/exchange-ml-token"
-            
-            # Certifique-se de que a chave corresponde à sua chave anónima/pública do Supabase guardada no st.secrets
-            # (Pode ajustar para st.secrets["SUPABASE_KEY"] ou o nome exato que utiliza no seu cofre)
             supabase_key = st.secrets["SUPABASE_KEY"] 
             
             payload = {
@@ -511,6 +494,7 @@ elif menu == "Integracao ML":
                     st.error(f"Erro na troca via Supabase (Estado {response.status_code}): {response.text}")
             except Exception as e:
                 st.error(f"Erro de comunicação com a Edge Function: {e}")
+
     if is_connected:
         st.success("✅ STATUS: Conectado ao Mercado Livre com Sucesso!")
         access_token = tokens_data[0]["access_token"]
@@ -634,7 +618,6 @@ elif menu == "Integracao ML":
         
         auth_url = f"https://auth.mercadolivre.com.br/authorization?response_type=code&client_id={ML_APP_ID}&redirect_uri={ML_REDIRECT_URI}"
         
-        # Botão estilizado para imitar a ação direta de conexão
         st.markdown(
             f"""
             <div style="text-align: center; margin-top: 20px; margin-bottom: 20px;">
