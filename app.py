@@ -470,14 +470,13 @@ elif menu == "Integracao ML":
     if auth_code and not is_connected:
         with st.spinner("A estabelecer ligação segura com o Mercado Livre..."):
             try:
-                # Resolve o IP utilizando diretamente o IP do Google DNS (8.8.8.8) para evitar o bloqueio de DNS do Render
+                # Resolve o IP utilizando o serviço seguro do Google DNS (dns.google)
                 target_ip = "api.mercadolivre.com"
                 try:
                     dns_res = requests.get(
-                        "https://8.8.8.8/resolve",
+                        "https://dns.google/resolve",
                         params={"name": "api.mercadolivre.com", "type": "A"},
-                        timeout=5,
-                        verify=False
+                        timeout=5
                     )
                     if dns_res.status_code == 200:
                         dns_data = dns_res.json()
@@ -504,7 +503,6 @@ elif menu == "Integracao ML":
                     "Host": "api.mercadolivre.com"
                 }
                 
-                # verify=False é obrigatório ao saltar a resolução DNS e ligar diretamente por IP com Host header
                 response = requests.post(token_url, data=payload, headers=headers, timeout=30, verify=False)
                 
                 if response.status_code == 200:
