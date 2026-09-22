@@ -23,7 +23,7 @@ SUPABASE_KEY = obter_segredo("SUPABASE_KEY")
 def init_connection():
     try:
         if not SUPABASE_URL or not SUPABASE_KEY:
-            raise ValueError("As credenciais do Supabase não foram encontradas nas variáveis de ambiente ou segredos.")
+            raise ValueError("As credenciais do Supabase não foram encontradas.")
         return create_client(SUPABASE_URL, SUPABASE_KEY)
     except Exception as e:
         st.error(f"Erro crítico ao carregar as credenciais do Supabase: {e}")
@@ -441,7 +441,7 @@ elif menu == "Controle de Estoque":
         st.info("Estoque vazio.")
 
 # -------------------------------------------------------------
-# ABA: INTEGRAÇÃO MERCADO LIVRE
+# ABA: INTEGRAÇÃO MERCADO LIVRE (TROCA DIRETA NO RENDER)
 # -------------------------------------------------------------
 elif menu == "Integracao ML":
     st.title("Integração Oficial - Mercado Livre")
@@ -463,8 +463,9 @@ elif menu == "Integracao ML":
     except Exception:
         is_connected = False
 
+    # TROCA DIRETA DO TOKEN (SEM SUPABASE EDGE FUNCTION)
     if auth_code and not is_connected:
-        with st.spinner("A estabelecer ligação com o Mercado Livre..."):
+        with st.spinner("A estabelecer ligação direta com o Mercado Livre..."):
             token_url = "https://api.mercadolivre.com/oauth/token"
             
             payload = {
