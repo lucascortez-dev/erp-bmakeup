@@ -441,7 +441,7 @@ elif menu == "Controle de Estoque":
         st.info("Estoque vazio.")
 
 # -------------------------------------------------------------
-# ABA: INTEGRAÇÃO MERCADO LIVRE (TROCA DIRETA NO RENDER)
+# ABA: INTEGRAÇÃO MERCADO LIVRE (DOMÍNIO CORRIGIDO: MERCADOLIBRE.COM)
 # -------------------------------------------------------------
 elif menu == "Integracao ML":
     st.title("Integração Oficial - Mercado Livre")
@@ -463,36 +463,24 @@ elif menu == "Integracao ML":
     except Exception:
         is_connected = False
 
-    # TROCA DIRETA DO TOKEN (SEM SUPABASE EDGE FUNCTION)
     if auth_code and not is_connected:
-        with st.spinner("A estabelecer ligação segura com o Mercado Livre..."):
+        with st.spinner("A estabelecer ligação direta com o Mercado Livre..."):
+            token_url = "https://api.mercadolibre.com/oauth/token"
+            
+            payload = {
+                "grant_type": "authorization_code",
+                "client_id": ML_APP_ID,
+                "client_secret": ML_CLIENT_SECRET,
+                "code": auth_code,
+                "redirect_uri": ML_REDIRECT_URI
+            }
+            
+            headers = {
+                "accept": "application/json",
+                "content-type": "application/x-www-form-urlencoded"
+            }
+            
             try:
-                # Resolve o IP dinamicamente via DNS-over-HTTPS da Cloudflare para contornar falhas de DNS no Render
-                dns_res = requests.get("https://cloudflare-dns.com/dns-query?name=api.mercadolivre.com&type=A", headers={"Accept": "application/dns-json"}, timeout=10)
-                target_ip = "api.mercadolivre.com"
-                if dns_res.status_code == 200:
-                    dns_data = dns_res.json()
-                    if "Answer" in dns_data:
-                        record = next((r for r in dns_data["Answer"] if r.get("type") == 1), None)
-                        if record:
-                            target_ip = record.get("data")
-
-                token_url = f"https://{target_ip}/oauth/token"
-                
-                payload = {
-                    "grant_type": "authorization_code",
-                    "client_id": ML_APP_ID,
-                    "client_secret": ML_CLIENT_SECRET,
-                    "code": auth_code,
-                    "redirect_uri": ML_REDIRECT_URI
-                }
-                
-                headers = {
-                    "accept": "application/json",
-                    "content-type": "application/x-www-form-urlencoded",
-                    "Host": "api.mercadolivre.com"
-                }
-                
                 response = requests.post(token_url, data=payload, headers=headers, timeout=30)
                 
                 if response.status_code == 200:
@@ -532,17 +520,17 @@ elif menu == "Integracao ML":
         with col_sync1:
             if st.button("📦 Puxar Estoque Atualizado (ML)", use_container_width=True):
                 with st.spinner("Lendo catálogo do Mercado Livre..."):
-                    user_resp = requests.get("https://api.mercadolivre.com/users/me", headers=headers)
+                    user_resp = requests.get("https://api.mercadolibre.com/users/me", headers=headers)
                     if user_resp.status_code == 200:
                         user_id = user_resp.json().get("id")
-                        items_resp = requests.get(f"https://api.mercadolivre.com/users/{user_id}/items/search", headers=headers)
+                        items_resp = requests.get(f"https://api.mercadolibre.com/users/{user_id}/items/search", headers=headers)
                         
                         if items_resp.status_code == 200:
                             item_ids = items_resp.json().get("results", [])
                             produtos_salvos = 0
                             
                             for item_id in item_ids:
-                                detail_resp = requests.get(f"https://api.mercadolivre.com/items/{item_id}", headers=headers)
+                                detail_resp = requests.get(f"https://api.mercadolibre.com/items/{item_id}", headers=headers)
                                 if detail_resp.status_code == 200:
                                     prod = detail_resp.json()
                                     sku_val = prod.get("seller_custom_field")
@@ -575,10 +563,10 @@ elif menu == "Integracao ML":
         with col_sync2:
             if st.button("🛒 Puxar Vendas e Taxas (ML)", use_container_width=True):
                 with st.spinner("Processando financeiro item a item..."):
-                    user_resp = requests.get("https://api.mercadolivre.com/users/me", headers=headers)
+                    user_resp = requests.get("https://api.mercadolibre.com/users/me", headers=headers)
                     if user_resp.status_code == 200:
                         user_id = user_resp.json().get("id")
-                        orders_resp = requests.get(f"https://api.mercadolivre.com/orders/search?seller={user_id}", headers=headers)
+                        orders_resp = requests.get(f"https://api.mercadolibre.com/orders/search?seller={user_id}", headers=headers)
                         
                         if orders_resp.status_code == 200:
                             orders_list = orders_resp.json().get("results", [])
