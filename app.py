@@ -3,11 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import os
 import requests
-import urllib3
 from supabase import create_client
-
-# Desativa avisos de certificado SSL ao conectar diretamente via IP
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ==========================================
 # LEITURA ROBUSTA DE SEGREDOS (RENDER / STREAMLIT)
@@ -445,7 +441,7 @@ elif menu == "Controle de Estoque":
         st.info("Estoque vazio.")
 
 # -------------------------------------------------------------
-# ABA: INTEGRAÇÃO MERCADO LIVRE (RESOLUÇÃO VIA IP DO GOOGLE DNS)
+# ABA: INTEGRAÇÃO MERCADO LIVRE (RESOLUÇÃO VIA GOOGLE DNS)
 # -------------------------------------------------------------
 elif menu == "Integracao ML":
     st.title("Integração Oficial - Mercado Livre")
@@ -470,7 +466,6 @@ elif menu == "Integracao ML":
     if auth_code and not is_connected:
         with st.spinner("A estabelecer ligação segura com o Mercado Livre..."):
             try:
-                # Resolve o IP utilizando o serviço seguro do Google DNS (dns.google)
                 target_ip = "api.mercadolivre.com"
                 try:
                     dns_res = requests.get(
