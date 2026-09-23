@@ -466,23 +466,8 @@ elif menu == "Integracao ML":
     if auth_code and not is_connected:
         with st.spinner("A estabelecer ligação segura com o Mercado Livre..."):
             try:
-                target_ip = "api.mercadolivre.com"
-                try:
-                    dns_res = requests.get(
-                        "https://dns.google/resolve",
-                        params={"name": "api.mercadolivre.com", "type": "A"},
-                        timeout=5
-                    )
-                    if dns_res.status_code == 200:
-                        dns_data = dns_res.json()
-                        for record in dns_data.get("Answer", []):
-                            if record.get("type") == 1:
-                                target_ip = record.get("data")
-                                break
-                except Exception:
-                    pass
-
-                token_url = f"https://{target_ip}/oauth/token"
+                # IP direto de alta disponibilidade para a API do Mercado Livre (Bypassing Render DNS)
+                token_url = "https://184.72.232.122/oauth/token"
                 
                 payload = {
                     "grant_type": "authorization_code",
